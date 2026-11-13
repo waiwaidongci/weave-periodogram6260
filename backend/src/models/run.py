@@ -10,6 +10,7 @@ class SpectrumRun(Base):
  name:Mapped[str]=mapped_column(String(180),unique=True)
  source_snapshot:Mapped[dict]=mapped_column(JSON)
  plan_snapshot:Mapped[dict]=mapped_column(JSON)
+ trend_plan_snapshot:Mapped[dict|None]=mapped_column(JSON,nullable=True)
  status:Mapped[str]=mapped_column(String(24),default='queued')
  result:Mapped[dict|None]=mapped_column(JSON,nullable=True)
  error:Mapped[str|None]=mapped_column(Text,nullable=True)

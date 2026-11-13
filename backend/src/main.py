@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from redis import Redis
-from src.config.database import Base,engine
+from src.config.database import Base,engine,ensure_columns
 from src.config.settings import REDIS_URL,SEED_DEMO
 from src.models import *
 from src.middlewares.request_id import RequestIDMiddleware
@@ -15,6 +15,8 @@ from src.routes import auth,source,plans,runs,notes,audit
 @asynccontextmanager
 async def lifespan(app):
  Base.metadata.create_all(engine)
+ try:ensure_columns()
+ except Exception:logging.exception('column upgrade failure; startup continues')
  if SEED_DEMO:
   try:
    from scripts.seed_demo import seed

@@ -1,4 +1,6 @@
 -- ORM metadata creates initial schema. No production migration runner is claimed.
 -- traverse_studies(name UNIQUE); traverse_points(study_id,reference UNIQUE,position UNIQUE,thickness)
 -- frequency_plans(frequencies JSON,permutations,seed); spectrum_runs(source_snapshot JSON,plan_snapshot JSON,result JSON)
+-- Optional frozen linear trend plan: spectrum_runs.trend_plan_snapshot JSON NULL.
 -- weave_notes(result_snapshot JSON), users, audit_logs. Numeric mappings use Double(asdecimal=False).
+-- Existing databases: startup ensure_columns() adds trend_plan_snapshot when absent (idempotent).

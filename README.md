@@ -34,11 +34,12 @@ Compose恰好frontend/backend/worker/db/redis五服务，各有healthcheck。Ngi
 2. 在“不等距测线”核对 `LD-34A 十八毫米纹理` / `ld-traverse-1-202611.csv`，如 `LD1-P001` 的位置mm和厚度mm。保留实际间距，不插成等距输入。
 3. 导入独立织片JSON或修订厚度；重复位置会拒绝。每条4–240点、跨度≤10000mm，已有任务保留提交时数据快照。
 4. 在“频率计划”预先声明周期范围10–90mm：fmin=1/90、fmax=.1、201等频点、B199、seed234。计划冻结后不编辑；看过谱峰才改范围应作为探索新研究，需独立资料核对。
-5. 从该测线的冻结计划排队。提交时源点和计划都复制进run，worker只使用这两份快照。
-6. A研究120点/201频点，选中18mm、功率.933678718814。全网格null最大值没有达到观测值，p=(0+1)/(199+1)=.005，而不是对挑出的频率报单频p。
-7. 读选频率带截距拟合、相对于x₀的幅度/相位、全部谱与采样窗口函数，核对混叠和泄漏。网格间距不是周期置信区间。
-8. 在“织片补测”写独立织片来源、保持预设网格和不等距补测位置的行动，不认定织机成因。
-9. 方绎批准或退回；苏纾下载批准全谱CSV。重复审批409，事后改点不能改写冻结运行或批准快照；过程留痕保留导入、计划、队列、审阅和导出。
+5. 若测线沿位置可能有线性漂移，同时勾选“线性趋势校正计划”并写明预先声明的理由。提交时趋势计划与源点、频率计划一起冻结进run；看过谱峰后才补趋势声明不成立。
+6. 从该测线的冻结计划排队，worker只使用提交时复制的源点、频率计划与可选趋势计划快照。
+7. A研究120点/201频点，未校正全网格选中18mm、功率.933678718814、p=.005，而不是对挑出的频率报单频p。另建的演示趋势校正研究在同一快照上得到校正后功率.934712、p=.005，页面并列校正前后；两者不能互相冒充。
+8. 读选频率带截距（趋势运行时另有c₁线性斜率）拟合、相对于x₀的幅度/相位、全部谱与采样窗口函数，核对混叠和泄漏。网格间距不是周期置信区间。
+9. 在“织片补测”写独立织片来源、保持预设网格和不等距补测位置的行动，不认定织机成因。
+10. 方绎批准或退回；苏纾下载批准全谱CSV。重复审批409，事后改点不能改写冻结运行或批准快照；过程留痕保留导入、计划、队列、审阅和导出。
 
 ## 数值口径
 
@@ -54,9 +55,19 @@ cos/sin列各减其均值形成A，QR分解A=QR。对中心化厚度y_c，解释
 
 采样窗口是`|mean(exp(i2πf(x−x₀)))|²`，只由位置决定，用来核对采样结构；它不能消除混叠。默认网格Δf约.00044444444 cycles/mm，不等于周期CI。该全局p只对预先冻结的搜索范围、iid可交换且同方差误差的无周期null解释，不是制造原因、在线诊断或任意后验挑范围的确认检验。
 
+### 线性趋势校正计划
+
+沿测线的线性漂移会把低频功率混入周期证据，因此运行可选地在排队时冻结一份趋势校正计划（`trendy=true`、`algorithm=linear-trend`、非空`trend_declaration`；未启用时禁止携带趋势字段）。趋势计划写入`SpectrumRun.trend_plan_snapshot`，与源点、频率计划同样取自提交时快照，事后修改测点或重新声明都不能改写它。
+
+基线模型为`y=c₀+c₁(x−x₀)`，周期模型为基线再叠加`a cos(2πf(x−x₀))+b sin(2πf(x−x₀))`。先把cos/sin列对[1,x−x₀]正交化，再在基线残差上QR；功率`1−RSSf/RSS0`，其中RSS0是基线残差平方和，等价于叠加周期项相对基线的增量解释比例，同样裁到[0,1]。逐频率保存`retained_after_trend=||(I−P_trend)[cos,sin]||²/N`，只由位置决定，用来核对趋势吸收了多少周期项空间。
+
+若正交化后sigma_min≤1e-10×max(sigma_max,sqrtN)，该频率与线性趋势不可区分，逐条列出原因并不纳入；全部频率都不可区分时全谱退化，运行明确失败，不返回空谱或伪造零功率。恒定厚度或厚度完全由线性趋势解释使基线RSS0数值为零时同样明确失败。固定x与冻结趋势，按基线残差置换y标签，每次置换重新最小二乘拟合趋势并把每个纳入频率对它自己的置换基线RSS归一化后取全网格最大；`p_global`口径与未校正运行相同，B199最小p=.005。保存全部null最大值、直方图、全谱、排除理由和最佳频率的原位置拟合/残差。
+
+趋势校正结果同时保存同一快照的未校正对照（`comparison.before`，全网格最大功率、选中频率、全谱、全局p与指纹）与校正后摘要；页面并列展示两者，并注明趋势只作为基线混杂项，不是周期证据，也不把校正前后的选择说成两次独立检验。
+
 ## 实体、界面与校验
 
-79个有职责的Python/TS/TSX/CSS文件（不含空包、依赖和dist）。五实体TraverseStudy → TraversePoint → FrequencyPlan → SpectrumRun → WeaveNote贯穿ORM/schema/service/routes、前端API/store和六页：谱峰总览、不等距测线、频率计划、完整谱与全局p、织片补测、过程留痕。
+81个有职责的Python/TS/TSX/CSS文件（不含空包、依赖和dist）。五实体TraverseStudy → TraversePoint → FrequencyPlan → SpectrumRun → WeaveNote贯穿ORM/schema/service/routes、前端API/store和六页：谱峰总览、不等距测线、频率计划、完整谱与全局p、织片补测、过程留痕。
 
 前端 `src/{api,stores,types,components/common,hooks,pages,router,utils,constants}`；后端 `src/{routes,controllers,services,models,schemas,middlewares,utils,constants,config}`，另scripts/seed_demo.py与migrations/。SpectrumPlot、TracePlot、PeakSummary、RunList在多页复用，PermutationPanel只画后端实际null频数；useTask/useRoute和format处理交互。React挂载id=root与createRoot一致。
 
@@ -69,7 +80,7 @@ Role/RunStatus/NoteStatus位于 `backend/src/constants/enums.py`，前端对应 
 |前端|React18 / TypeScript / Vite6.4.6，Manrope+Noto Serif SC，靛墨/棉白/黄铜谱峰|
 |后端|Python3.11 / FastAPI / SQLAlchemy / PostgreSQL16|
 |队列|Celery5.4 / Kombu5.4.2 / Redis7，worker并发1|
-|算法|中心坐标QR全谱、全网格标签置换、采样窗口与选频拟合|
+|算法|中心坐标QR全谱、全网格标签置换、采样窗口与选频拟合；可选冻结线性趋势基线+基线残差置换|
 
 本地前端 `cd frontend && npm ci && npm run dev`；`npm run build`执行tsc/Vite。后端安装requirements并设置DATABASE_URL/REDIS_URL/JWT_SECRET后运行uvicorn。当前ORM create_all初始化，migrations只作初始结构说明，不声称生产迁移链。MIT许可证见LICENSE。
 
